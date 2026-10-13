@@ -2,7 +2,7 @@
 <title>Maine absentee vote: Republican share vs. 2020, same day</title>
 <style>body{font:15px system-ui,sans-serif;max-width:1100px;margin:1em auto;padding:0 1em;color:#222}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:1em}@media(max-width:700px){.grid{grid-template-columns:1fr}}
-svg{width:100%;height:auto}path{stroke:#fff;stroke-width:.3}path:hover{stroke:#000;stroke-width:1.2}
+svg{width:100%;height:auto}path{stroke:#fff;stroke-width:.3;fill-rule:evenodd}path:hover{stroke:#000;stroke-width:1.2}
 h2{font-size:1.05em;margin:.2em 0}#tip{position:fixed;pointer-events:none;background:#fff;border:1px solid #888;padding:6px 8px;font-size:13px;display:none}
 .ctl{display:flex;gap:.6em;align-items:center}.ctl input{flex:1}.note{color:#666;font-size:13px}#stat{font-size:13px;color:#444;margin:.1em 0 .4em}</style></head><body>
 <h1>Maine absentee vote: Republican share vs. 2020, same day</h1>
@@ -49,7 +49,14 @@ const dayLabel = i => { const d = ts.days_out[i];
 const pct = c => p2(c) == null ? "–" : (p2(c) * 100).toFixed(1) + "%";
 const cell = c => `R ${c.gop} · D ${c.dem} · other ${c.oth}`;
 
-const proj = d3.geoMercator().fitSize([500, 560], {type: "FeatureCollection", features: feats}), path = d3.geoPath(proj);
+// Planar projection (longitude scaled by cos(latitude), fit to the box). Unlike d3's spherical projections it does
+// not depend on polygon winding order, so shapes always draw as outlines instead of filling the whole globe.
+const COS = Math.cos(45.3 * Math.PI / 180);
+let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+const scan = c => { if (typeof c[0] === "number") { x0 = Math.min(x0, c[0] * COS); x1 = Math.max(x1, c[0] * COS); y0 = Math.min(y0, c[1]); y1 = Math.max(y1, c[1]); } else c.forEach(scan); };
+feats.forEach(f => scan(f.geometry.coordinates));
+const K = Math.min(500 / (x1 - x0), 560 / (y1 - y0)), TX = (500 - K * (x1 - x0)) / 2 - K * x0, TY = (560 - K * (y1 - y0)) / 2 + K * y1;
+const path = d3.geoPath(d3.geoTransform({point(x, y) { this.stream.point(x * COS * K + TX, -y * K + TY); }}));
 function init(id) {
   const svg = d3.select(id).attr("viewBox", "0 0 500 560");
   return svg.selectAll("path").data(feats).join("path").attr("d", path).attr("fill", "#ddd")
