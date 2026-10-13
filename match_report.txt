@@ -1,0 +1,14 @@
+===== 2020 (Maine_2020.txt) =====
+dropped: accepted but no/unreadable receive date: 10
+rows: 532272
+skipped: not accepted: 17843
+accepted ballots counted (one per voter): 514419; matched to map towns: 514419; as-of date used: 2020-11-03
+date repairs: 10/07/1320 -> 10/07/2020 (x1); 10/10/0820 -> 10/10/2020 (x1)
+UNMATCHED town names: 0 (0 ballots)
+===== 2026 (Maine_2026.txt) =====
+dropped: accepted but no/unreadable receive date: 21
+dropped: blank municipality: 8
+rows: 130655
+skipped: not accepted: 86187
+accepted ballots counted (one per voter): 44439; matched to map towns: 44439; as-of date used: 2026-10-09
+UNMATCHED town names: 0 (0 ballots)
