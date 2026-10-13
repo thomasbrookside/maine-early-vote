@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Maine absentee vote: Republican share vs. 2020, same day</title>
+<style>body{font:15px system-ui,sans-serif;max-width:1100px;margin:1em auto;padding:0 1em;color:#222}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1em}@media(max-width:700px){.grid{grid-template-columns:1fr}}
+svg{width:100%;height:auto}path{stroke:#fff;stroke-width:.3}path:hover{stroke:#000;stroke-width:1.2}
+h2{font-size:1.05em;margin:.2em 0}#tip{position:fixed;pointer-events:none;background:#fff;border:1px solid #888;padding:6px 8px;font-size:13px;display:none}
+.ctl{display:flex;gap:.6em;align-items:center}.ctl input{flex:1}.note{color:#666;font-size:13px}#stat{font-size:13px;color:#444;margin:.1em 0 .4em}</style></head><body>
+<h1>Maine absentee vote: Republican share vs. 2020, same day</h1>
+<p class="note">Towns colored by change in Republican share of Republican + Democratic accepted absentee ballots (mail + in-person absentee), 2026 so far vs. 2020 on the same number of days before Election Day (both Nov 3). Each voter is counted once, on the date their accepted ballot was received. Unenrolled, Green and Libertarian voters are excluded from the share. Towns with fewer than 25 Republican + Democratic ballots in either year are gray. 2020 absentee voting was unusually heavy (pandemic), so differences reflect who is voting early as well as how many; early shifts can fade as voting continues.</p>
+<div class="grid"><div><h2 id="t1"></h2><div id="stat"></div><svg id="m1"></svg></div><div><h2 id="t2"></h2><div id="stat2"></div><svg id="m2"></svg>
+<div class="ctl"><button id="play">▶ Play</button><input id="sl" type="range" min="0" value="0"></div></div></div>
+<div style="max-width:420px;margin:1em auto"><svg id="lg" viewBox="0 0 420 46"></svg></div><div id="tip"></div>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script>
+// Color scale: negative = less Republican than 2020 on the same day (blue), positive = more (red).
+// Recalibrate these after you see the real data.
+const MIN_SHIFT = -30;
+const MAX_SHIFT = 30;
+const MIN_TOTAL = 25;           // minimum R+D ballots, in BOTH years, for a town to be colored
+const START_DAYS_OUT = 35;      // slider starts this many days before Election Day
+
+const col = s => {
+  if (s == null) return "#ddd";
+  const t = s < 0
+    ? 0.5 + 0.5 * Math.min(1, -s / -MIN_SHIFT)
+    : 0.5 - 0.5 * Math.min(1, s / MAX_SHIFT);
+  return d3.interpolateRdBu(t);
+};
+const tip = d3.select("#tip");
+(async () => {
+const [topo, ts] = await Promise.all([d3.json("data/maine_towns.topo.json"), d3.json("data/timeseries.json")]);
+const feats = topojson.feature(topo, topo.objects.towns).features;
+const T = ts.towns, EMPTY = {gop: [], dem: [], oth: []};
+const last = ts.lengths["2026"] - 1;              // latest day with 2026 data (index into days_out)
+const si = ts.days_out.findIndex(d => d <= START_DAYS_OUT);
+const START_INDEX = Math.min(si < 0 ? 0 : si, last);
+// counts for a town/year at day index i (cumulative); missing arrays mean zero ballots
+const get = (n, y, i) => { const a = (T[n] && T[n][y]) || EMPTY; return {gop: a.gop[i] || 0, dem: a.dem[i] || 0, oth: a.oth[i] || 0}; };
+const p2 = c => c.gop + c.dem ? c.gop / (c.gop + c.dem) : null;
+function shift(n, i) {
+  const a = get(n, "2026", i), b = get(n, "2020", i);
+  return a.gop + a.dem < MIN_TOTAL || b.gop + b.dem < MIN_TOTAL ? null : (p2(a) - p2(b)) * 100;
+}
+const fmtDate = (iso, d) => { const x = new Date(iso + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() - d);
+  return x.toLocaleDateString("en-US", {month: "short", day: "numeric", timeZone: "UTC"}); };
+const dayLabel = i => { const d = ts.days_out[i];
+  return `${fmtDate(ts.elections["2026"], d)} (${d} days before Election Day)`; };
+const pct = c => p2(c) == null ? "–" : (p2(c) * 100).toFixed(1) + "%";
+const cell = c => `R ${c.gop} · D ${c.dem} · other ${c.oth}`;
+
+const proj = d3.geoMercator().fitSize([500, 560], {type: "FeatureCollection", features: feats}), path = d3.geoPath(proj);
+function init(id) {
+  const svg = d3.select(id).attr("viewBox", "0 0 500 560");
+  return svg.selectAll("path").data(feats).join("path").attr("d", path).attr("fill", "#ddd")
+    .on("mousemove", (e, f) => {
+      const i = id === "#m1" ? last : +sl.value, n = f.properties.name, a = get(n, "2026", i), b = get(n, "2020", i), x = shift(n, i);
+      tip.style("display", "block").style("left", e.clientX + 12 + "px").style("top", e.clientY + 12 + "px")
+        .html(`<b>${n}</b><br>2020 GOP 2-party (same day): ${pct(b)}<br>2026: ${pct(a)}<br>Shift: ${x == null ? "insufficient data" : (x > 0 ? "+" : "") + x.toFixed(1) + " pts"}<br>2026 — ${cell(a)}<br>2020 — ${cell(b)}`);
+    })
+    .on("mouseleave", () => tip.style("display", "none"));
+}
+function totals(i) {
+  const s = {2026: {gop: 0, dem: 0, oth: 0}, 2020: {gop: 0, dem: 0, oth: 0}};
+  for (const n in T) for (const y of ["2026", "2020"]) { const c = get(n, y, i); for (const k in c) s[y][k] += c[k]; }
+  const tot = c => c.gop + c.dem + c.oth;
+  return `Statewide GOP 2-party: <b>${pct(s[2026])}</b> in 2026 vs. ${pct(s[2020])} in 2020 · ballots received: ${tot(s[2026]).toLocaleString()} vs. ${tot(s[2020]).toLocaleString()}`;
+}
+function paint(sel, i, t) { sel.transition().duration(t).attr("fill", f => col(shift(f.properties.name, i))); }
+const sl = document.getElementById("sl");
+const m1 = init("#m1"), m2 = init("#m2");
+d3.select("#t1").text("Current: through " + dayLabel(last) + " — file as of " + ts.asof["2026"]);
+d3.select("#stat").html(totals(last)); paint(m1, last, 0);
+sl.min = START_INDEX; sl.max = last; sl.value = START_INDEX;
+const show = i => { i = Math.max(START_INDEX, Math.min(last, i)); d3.select("#t2").text("Over time: through " + dayLabel(i));
+  d3.select("#stat2").html(totals(i)); paint(m2, i, 300); sl.value = i; };
+show(START_INDEX);
+sl.oninput = () => show(+sl.value); let tm = null;
+play.onclick = () => { if (tm) { clearInterval(tm); tm = null; play.textContent = "▶ Play"; return }
+  play.textContent = "⏸ Pause"; if (+sl.value >= last) show(START_INDEX);
+  tm = setInterval(() => { if (+sl.value >= last) { clearInterval(tm); tm = null; play.textContent = "▶ Play" } else show(+sl.value + 1) }, 1600) };
+
+const lg = d3.select("#lg");
+const g = lg.append("defs").append("linearGradient").attr("id", "gr");
+d3.range(0, 1.001, 0.025).forEach(t => {
+  const s = MIN_SHIFT + t * (MAX_SHIFT - MIN_SHIFT);
+  g.append("stop").attr("offset", `${t * 100}%`).attr("stop-color", col(s));
+});
+lg.append("rect").attr("x", 20).attr("y", 4).attr("width", 380).attr("height", 12).attr("fill", "url(#gr)");
+const zeroX = 20 + 380 * (-MIN_SHIFT) / (MAX_SHIFT - MIN_SHIFT);
+lg.append("text").attr("x", 20).attr("y", 28).attr("font-size", 10).text("−" + (-MIN_SHIFT) + " pts");
+lg.append("text").attr("x", zeroX).attr("y", 28).attr("text-anchor", "middle").attr("font-size", 10).text("0");
+lg.append("text").attr("x", 400).attr("y", 28).attr("text-anchor", "end").attr("font-size", 10).text("+" + MAX_SHIFT + " pts");
+lg.append("text").attr("x", 210).attr("y", 38).attr("text-anchor", "middle").attr("font-size", 10).text("change in GOP two-party share vs. 2020, same day");
+})();
+</script></body></html>
