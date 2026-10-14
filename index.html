@@ -9,7 +9,7 @@ h2{font-size:1.05em;margin:.2em 0}#tip{position:fixed;pointer-events:none;backgr
 <p class="note">Towns colored by change in Republican share of Republican + Democratic accepted absentee ballots (mail + in-person absentee), 2026 so far vs. 2020 on the same number of days before Election Day (both Nov 3). Each voter is counted once, on the date their accepted ballot was received. Unenrolled, Green and Libertarian voters are excluded from the share. Towns with fewer than 25 Republican + Democratic ballots in either year are gray. 2020 absentee voting was unusually heavy (pandemic), so differences reflect who is voting early as well as how many; early shifts can fade as voting continues.</p>
 <div class="grid"><div><h2 id="t1"></h2><div id="stat"></div><svg id="m1"></svg></div><div><h2 id="t2"></h2><div id="stat2"></div><svg id="m2"></svg>
 <div class="ctl"><button id="play">▶ Play</button><input id="sl" type="range" min="0" value="0"></div></div></div>
-<div style="max-width:420px;margin:1em auto"><svg id="lg" viewBox="0 0 420 46"></svg></div><div id="tip"></div>
+<div style="max-width:420px;margin:1em auto"><svg id="lg" viewBox="0 0 420 64"></svg></div><div id="tip"></div>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script>
@@ -18,14 +18,15 @@ h2{font-size:1.05em;margin:.2em 0}#tip{position:fixed;pointer-events:none;backgr
 const MIN_SHIFT = -30;
 const MAX_SHIFT = 30;
 const MIN_TOTAL = 25;           // minimum R+D ballots, in BOTH years, for a town to be colored
-const START_DAYS_OUT = 31;      // slider starts this many days before Election Day
+const START_DAYS_OUT = 35;      // slider starts this many days before Election Day
+const SCHEME = "RdYlBu";        // d3 color scheme; its pale-yellow middle (no shift) is clearly different from the gray "no data"
 
 const col = s => {
   if (s == null) return "#ddd";
   const t = s < 0
     ? 0.5 + 0.5 * Math.min(1, -s / -MIN_SHIFT)
     : 0.5 - 0.5 * Math.min(1, s / MAX_SHIFT);
-  return d3.interpolateRdBu(t);
+  return d3["interpolate" + SCHEME](t);
 };
 const tip = d3.select("#tip");
 (async () => {
@@ -99,5 +100,7 @@ lg.append("text").attr("x", 20).attr("y", 28).attr("font-size", 10).text("−" +
 lg.append("text").attr("x", zeroX).attr("y", 28).attr("text-anchor", "middle").attr("font-size", 10).text("0");
 lg.append("text").attr("x", 400).attr("y", 28).attr("text-anchor", "end").attr("font-size", 10).text("+" + MAX_SHIFT + " pts");
 lg.append("text").attr("x", 210).attr("y", 38).attr("text-anchor", "middle").attr("font-size", 10).text("change in GOP two-party share vs. 2020, same day");
+lg.append("rect").attr("x", 118).attr("y", 46).attr("width", 12).attr("height", 12).attr("fill", "#ddd");
+lg.append("text").attr("x", 135).attr("y", 56).attr("font-size", 10).text("too few ballots (under " + MIN_TOTAL + " R+D in either year)");
 })();
 </script></body></html>
