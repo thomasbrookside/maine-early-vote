@@ -9,7 +9,7 @@ h2{font-size:1.05em;margin:.2em 0}#tip{position:fixed;pointer-events:none;backgr
 <p class="note">Towns colored by change in Republican share of Republican + Democratic accepted absentee ballots (mail + in-person absentee), 2026 so far vs. 2020 on the same number of days before Election Day (both Nov 3). Each voter is counted once, on the date their accepted ballot was received. Unenrolled, Green and Libertarian voters are excluded from the share. Towns with fewer than 25 Republican + Democratic ballots in either year are gray. 2020 absentee voting was unusually heavy (pandemic), so differences reflect who is voting early as well as how many; early shifts can fade as voting continues.</p>
 <div class="grid"><div><h2 id="t1"></h2><div id="stat"></div><svg id="m1"></svg></div><div><h2 id="t2"></h2><div id="stat2"></div><svg id="m2"></svg>
 <div class="ctl"><button id="play">▶ Play</button><input id="sl" type="range" min="0" value="0"></div></div></div>
-<div style="max-width:420px;margin:1em auto"><svg id="lg" viewBox="0 0 420 46"></svg></div><div id="tip"></div>
+<div style="max-width:420px;margin:1em auto"><svg id="lg" viewBox="0 0 420 64"></svg></div><div id="tip"></div>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script>
@@ -19,13 +19,14 @@ const MIN_SHIFT = -30;
 const MAX_SHIFT = 30;
 const MIN_TOTAL = 25;           // minimum R+D ballots, in BOTH years, for a town to be colored
 const START_DAYS_OUT = 35;      // slider starts this many days before Election Day
+const LIGHTEST = 0.25;          // tint at the smallest shift: 0 = white, higher = more color. Every colored town is visibly red or blue
 
 const col = s => {
-  if (s == null) return "#ddd";
-  const t = s < 0
-    ? 0.5 + 0.5 * Math.min(1, -s / -MIN_SHIFT)
-    : 0.5 - 0.5 * Math.min(1, s / MAX_SHIFT);
-  return d3.interpolateRdBu(t);
+  if (s == null) return "#ddd";                              // not enough data
+  // no neutral middle: any shift below zero is blue, zero or above is red; near-zero shifts are just very light
+  return s < 0
+    ? d3.interpolateBlues(LIGHTEST + (1 - LIGHTEST) * Math.min(1, -s / -MIN_SHIFT))
+    : d3.interpolateReds(LIGHTEST + (1 - LIGHTEST) * Math.min(1, s / MAX_SHIFT));
 };
 const tip = d3.select("#tip");
 (async () => {
@@ -89,15 +90,17 @@ play.onclick = () => { if (tm) { clearInterval(tm); tm = null; play.textContent 
 
 const lg = d3.select("#lg");
 const g = lg.append("defs").append("linearGradient").attr("id", "gr");
-d3.range(0, 1.001, 0.025).forEach(t => {
-  const s = MIN_SHIFT + t * (MAX_SHIFT - MIN_SHIFT);
-  g.append("stop").attr("offset", `${t * 100}%`).attr("stop-color", col(s));
-});
+const zf = -MIN_SHIFT / (MAX_SHIFT - MIN_SHIFT), stops = [];
+d3.range(0, 1.001, 0.025).forEach(t => { if (Math.abs(t - zf) > 1e-9) stops.push([t, col(MIN_SHIFT + t * (MAX_SHIFT - MIN_SHIFT))]); });
+stops.push([zf, col(-1e-9)], [zf, col(0)]);                  // hard edge: light blue | light red
+stops.sort((a, b) => a[0] - b[0]).forEach(([t, c]) => g.append("stop").attr("offset", `${t * 100}%`).attr("stop-color", c));
 lg.append("rect").attr("x", 20).attr("y", 4).attr("width", 380).attr("height", 12).attr("fill", "url(#gr)");
 const zeroX = 20 + 380 * (-MIN_SHIFT) / (MAX_SHIFT - MIN_SHIFT);
 lg.append("text").attr("x", 20).attr("y", 28).attr("font-size", 10).text("−" + (-MIN_SHIFT) + " pts");
 lg.append("text").attr("x", zeroX).attr("y", 28).attr("text-anchor", "middle").attr("font-size", 10).text("0");
 lg.append("text").attr("x", 400).attr("y", 28).attr("text-anchor", "end").attr("font-size", 10).text("+" + MAX_SHIFT + " pts");
 lg.append("text").attr("x", 210).attr("y", 38).attr("text-anchor", "middle").attr("font-size", 10).text("change in GOP two-party share vs. 2020, same day");
+lg.append("rect").attr("x", 118).attr("y", 46).attr("width", 12).attr("height", 12).attr("fill", "#ddd");
+lg.append("text").attr("x", 135).attr("y", 56).attr("font-size", 10).text("too few ballots (under " + MIN_TOTAL + " R+D in either year)");
 })();
 </script></body></html>
